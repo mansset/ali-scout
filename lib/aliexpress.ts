@@ -69,21 +69,49 @@ function extractJson<T>(html: string, pattern: RegExp): T | null {
   try { return JSON.parse(m[1]) as T; } catch { return null; }
 }
 
+/** Pull a usable product name from several sources, cleaning the " - AliExpress …" suffix. */
+function extractTitle(html: string): string | undefined {
+  const candidates = [
+    extractMeta(html, "og:title"),
+    extractMeta(html, "twitter:title"),
+    html.match(/<title[^>]*>([^<]+)<\/title>/)?.[1],
+    html.match(/"subject"\s*:\s*"([^"]{5,160})"/)?.[1],
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const cleaned = raw
+      .replace(/\s*[-|]\s*AliExpress.*$/i, "") // strip "- AliExpress 200000343"
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleaned.length >= 5) return cleaned;
+  }
+  return undefined;
+}
+
 /* ── main export ── */
 
 export async function fetchFullProductData(url: string): Promise<AliExpressFullData | null> {
   const productId = extractProductId(url);
   if (!productId) return null;
 
+  // ScraperAPI render is intermittent (transient 500s / empty pages) — retry up to 2x
+  // until we have a real product title.
   let html = "";
-  try {
-    const res = await proxiedFetch(url, 90_000);
-    if (res.ok) html = await res.text();
-  } catch { /* network error – continue with empty html */ }
+  let title: string | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await proxiedFetch(url, 55_000);
+      if (res.ok) {
+        const body = await res.text();
+        const t = extractTitle(body);
+        if (t) { html = body; title = t; break; }   // good fetch
+        if (!html) html = body;                       // keep last body as fallback
+      }
+    } catch { /* network error – try again */ }
+  }
 
   /* ── product meta ── */
   const image = extractMeta(html, "og:image");
-  const title = extractMeta(html, "og:title") ?? extractMeta(html, "title");
 
   /* ── review stats ── */
   type RunParams = { data?: { feedbackComponent?: { evarageStar?: string | number; totalValidNum?: number; fiveStarNum?: number } } };
