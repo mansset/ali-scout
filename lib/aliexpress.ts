@@ -77,7 +77,7 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
 
   let html = "";
   try {
-    const res = await proxiedFetch(url, 50_000);
+    const res = await proxiedFetch(url, 90_000);
     if (res.ok) html = await res.text();
   } catch { /* network error – continue with empty html */ }
 

@@ -3,8 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/prompt";
 import { fetchFullProductData, extractProductId } from "@/lib/aliexpress";
 
-// Scraping proxy + Claude can take a while — allow up to 60s
-export const maxDuration = 60;
+// Scraping proxy (JS render ~40-50s) + Claude — needs a long budget
+export const maxDuration = 120;
 
 const MOCK_RESPONSE = {
   verdict: "БРАТИ",
