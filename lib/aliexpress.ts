@@ -47,8 +47,8 @@ const HEADERS = {
 async function proxiedFetch(targetUrl: string, timeoutMs: number): Promise<Response> {
   const key = process.env.SCRAPER_API_KEY;
   if (key) {
-    // ScraperAPI premium residential proxies bypass AliExpress datacenter-IP blocking (~4-5s)
-    const proxied = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&premium=true&country_code=us`;
+    // ScraperAPI with JS rendering reliably bypasses AliExpress datacenter-IP blocking (~40s)
+    const proxied = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&render=true`;
     return fetch(proxied, { signal: AbortSignal.timeout(timeoutMs) });
   }
   return fetch(targetUrl, { headers: HEADERS, signal: AbortSignal.timeout(timeoutMs) });
@@ -77,7 +77,7 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
 
   let html = "";
   try {
-    const res = await proxiedFetch(url, 30_000);
+    const res = await proxiedFetch(url, 50_000);
     if (res.ok) html = await res.text();
   } catch { /* network error – continue with empty html */ }
 
