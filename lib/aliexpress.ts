@@ -24,11 +24,35 @@ export function isAliExpressUrl(text: string): boolean {
 
 const HEADERS = {
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  "Accept":
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9,uk;q=0.8,ru;q=0.7",
+  "Accept-Encoding": "gzip, deflate, br",
   "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Sec-Ch-Ua": '"Google Chrome";v="126", "Chromium";v="126", "Not.A/Brand";v="24"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"macOS"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+  "Referer": "https://www.google.com/",
 };
+
+/* ── fetch helper: routes through ScraperAPI proxy when SCRAPER_API_KEY is set ── */
+
+async function proxiedFetch(targetUrl: string, timeoutMs: number): Promise<Response> {
+  const key = process.env.SCRAPER_API_KEY;
+  if (key) {
+    // ScraperAPI premium residential proxies bypass AliExpress datacenter-IP blocking (~4-5s)
+    const proxied = `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(targetUrl)}&premium=true&country_code=us`;
+    return fetch(proxied, { signal: AbortSignal.timeout(timeoutMs) });
+  }
+  return fetch(targetUrl, { headers: HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+}
 
 /* ── helpers ── */
 
@@ -53,10 +77,7 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
 
   let html = "";
   try {
-    const res = await fetch(url, {
-      headers: HEADERS,
-      signal: AbortSignal.timeout(10_000),
-    });
+    const res = await proxiedFetch(url, 30_000);
     if (res.ok) html = await res.text();
   } catch { /* network error – continue with empty html */ }
 
@@ -120,9 +141,9 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
         pageSize: "30",
       });
 
-      const reviewsRes = await fetch(
+      const reviewsRes = await proxiedFetch(
         `https://feedback.aliexpress.com/pc/evaluation/getEvaluationByPage.do?${params}`,
-        { headers: HEADERS, signal: AbortSignal.timeout(8_000) }
+        25_000
       );
 
       if (reviewsRes.ok) {

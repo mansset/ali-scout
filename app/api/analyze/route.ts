@@ -3,6 +3,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/prompt";
 import { fetchFullProductData, extractProductId } from "@/lib/aliexpress";
 
+// Scraping proxy + Claude can take a while — allow up to 60s
+export const maxDuration = 60;
+
 const MOCK_RESPONSE = {
   verdict: "БРАТИ",
   score: 74,
