@@ -9,6 +9,9 @@ export interface ProductMeta {
   totalReviews?: number;
   fiveStarCount?: number;
   rating?: number;
+  price?: number;
+  originalPrice?: number;
+  currency?: string;
 }
 
 export interface AnalysisResult {

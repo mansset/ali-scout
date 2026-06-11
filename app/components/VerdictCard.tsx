@@ -49,6 +49,16 @@ export default function VerdictCard({ result, onReset }: Props) {
                   <p className="text-sm font-semibold mb-2 line-clamp-2" style={{ color: "#1A1A1A" }}>{p.title}</p>
                 )}
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {p.price != null && (
+                    <Stat label="Ціна" value={
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="font-black" style={{ color: BRAND }}>€{p.price.toFixed(2)}</span>
+                        {p.originalPrice != null && p.originalPrice > p.price && (
+                          <span className="text-xs line-through" style={{ color: "#BBB" }}>€{p.originalPrice.toFixed(2)}</span>
+                        )}
+                      </span>
+                    } />
+                  )}
                   {p.rating && (
                     <Stat label="Рейтинг" value={
                       <span className="flex items-center gap-1">

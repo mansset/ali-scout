@@ -5,6 +5,9 @@ export interface AliExpressProduct {
   totalReviews?: number;
   fiveStarCount?: number;
   rating?: number;
+  price?: number;          // current/sale price the dropshipper pays
+  originalPrice?: number;  // pre-discount price
+  currency?: string;       // ISO code, e.g. "EUR"
 }
 
 export interface AliExpressFullData {
@@ -20,6 +23,32 @@ export function extractProductId(url: string): string | null {
 
 export function isAliExpressUrl(text: string): boolean {
   return /aliexpress\.com\/(item|i)\/\d{10,}/i.test(text);
+}
+
+/**
+ * AliExpress embeds the real price in the `pdp_npi` URL parameter:
+ *   6@dis!EUR!<original>!<sale>!!!<original_CNY>!<sale_CNY>!@...
+ * Returns the sale price (what the dropshipper actually pays) + currency.
+ */
+export function extractPriceFromUrl(url: string): { price?: number; originalPrice?: number; currency?: string } {
+  try {
+    const npi = new URL(url).searchParams.get("pdp_npi");
+    if (!npi) return {};
+    const tokens = decodeURIComponent(npi).split("!");
+    const curIdx = tokens.findIndex((t) => /^[A-Z]{3}$/.test(t));
+    if (curIdx === -1) return {};
+    const currency = tokens[curIdx];
+    const nums = tokens
+      .slice(curIdx + 1)
+      .map((t) => parseFloat(t))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (nums.length === 0) return {};
+    const original = nums[0];
+    const sale = nums[1] ?? nums[0];
+    return { price: Math.min(original, sale), originalPrice: Math.max(original, sale), currency };
+  } catch {
+    return {};
+  }
 }
 
 const HEADERS = {
@@ -94,13 +123,16 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
   const productId = extractProductId(url);
   if (!productId) return null;
 
+  // Real price comes straight from the pdp_npi URL param (page render doesn't expose it)
+  const { price, originalPrice, currency } = extractPriceFromUrl(url);
+
   // ScraperAPI render is intermittent (transient 500s / empty pages) — retry up to 2x
   // until we have a real product title.
   let html = "";
   let title: string | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await proxiedFetch(url, 55_000);
+      const res = await proxiedFetch(url, 45_000);
       if (res.ok) {
         const body = await res.text();
         const t = extractTitle(body);
@@ -138,9 +170,12 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
   const descriptionText =
     productInfo?.description?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() ?? "";
 
+  const cur = currency ?? "EUR";
   const listing = [
     title ? `Назва: ${title}` : "",
     descriptionText ? `Опис: ${descriptionText.slice(0, 1500)}` : "",
+    price ? `Закупівельна ціна на AliExpress: ${price} ${cur}` : "",
+    originalPrice && originalPrice !== price ? `Ціна до знижки: ${originalPrice} ${cur}` : "",
     totalReviews ? `Кількість відгуків на картці: ${totalReviews}` : "",
     fiveStarCount ? `Відгуків 5★: ${fiveStarCount}` : "",
     rating ? `Середній рейтинг: ${rating}` : "",
@@ -187,7 +222,7 @@ export async function fetchFullProductData(url: string): Promise<AliExpressFullD
   } catch { /* reviews fetch failed – Claude will work with listing only */ }
 
   return {
-    product: { productId, image, title, totalReviews, fiveStarCount, rating },
+    product: { productId, image, title, totalReviews, fiveStarCount, rating, price, originalPrice, currency },
     listing: listing || `Товар з AliExpress (ID: ${productId})`,
     reviews,
   };
