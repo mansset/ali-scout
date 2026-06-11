@@ -47,10 +47,16 @@ export default function Home() {
 
       {/* ── RESULT STAGE ── */}
       {stage === "result" && result ? (
-        <div className="max-w-2xl mx-auto px-4 py-10 pb-20">
-          {showEmailCapture && <EmailCapture onSkip={() => setShowEmailCapture(false)} />}
-          <VerdictCard result={result} onReset={handleReset} />
-        </div>
+        <section className="w-full bg-white border-b border-gray-100" style={{ minHeight: "calc(100vh - 110px)" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 sm:py-12 pb-20">
+            {showEmailCapture && (
+              <div className="max-w-xl mx-auto">
+                <EmailCapture onSkip={() => setShowEmailCapture(false)} />
+              </div>
+            )}
+            <VerdictCard result={result} onReset={handleReset} />
+          </div>
+        </section>
       ) : (
 
       /* ── LANDING ── */
