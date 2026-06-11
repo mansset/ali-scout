@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export interface ProductMeta {
   productId: string;
@@ -45,8 +45,28 @@ export default function AnalyzeForm({ onResult, onLoading, loading }: Props) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [focused, setFocused] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const isValid = url.includes("aliexpress.com") && url.includes("/item/");
+
+  // progress ticker while analyzing
+  useEffect(() => {
+    if (!loading) { setElapsed(0); return; }
+    const start = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [loading]);
+
+  // ~45s flow — rotate status by elapsed time
+  const STEPS = [
+    { at: 0, text: "Відкриваємо сторінку товару…" },
+    { at: 8, text: "Обходимо захист AliExpress…" },
+    { at: 20, text: "Витягуємо фото, назву та категорію…" },
+    { at: 32, text: "AI аналізує товар і ринок…" },
+    { at: 44, text: "Формуємо вердикт…" },
+  ];
+  const currentStep = [...STEPS].reverse().find(s => elapsed >= s.at) ?? STEPS[0];
+  const progressPct = Math.min(95, Math.round((elapsed / 48) * 100));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,7 +129,7 @@ export default function AnalyzeForm({ onResult, onLoading, loading }: Props) {
         )}
       </div>
 
-      {!error && (
+      {!error && !loading && (
         <p style={{ fontSize: 13, color: C.disabled, margin: 0 }}>
           Вставте посилання — ми самі підтягнемо фото, опис і відгуки.
         </p>
@@ -167,12 +187,67 @@ export default function AnalyzeForm({ onResult, onLoading, loading }: Props) {
               <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
               <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
             </svg>
-            Читаємо відгуки...
+            Аналізуємо… {elapsed}с
           </>
         ) : (
           "Перевірити товар →"
         )}
       </button>
+
+      {/* PROGRESS PANEL */}
+      {loading && (
+        <div style={{
+          background: "#FFF8F5",
+          border: "1px solid #FFCFC0",
+          borderRadius: 14,
+          padding: "16px 16px 18px",
+          marginTop: 4,
+        }}>
+          {/* progress bar */}
+          <div style={{ height: 6, width: "100%", background: "#FFE3D6", borderRadius: 999, overflow: "hidden", marginBottom: 12 }}>
+            <div style={{
+              height: "100%",
+              width: `${progressPct}%`,
+              background: C.grad,
+              borderRadius: 999,
+              transition: "width 0.3s ease",
+            }} />
+          </div>
+
+          {/* current step */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{
+              width: 7, height: 7, borderRadius: "50%", background: C.brand,
+              animation: "pulse 1s ease-in-out infinite", flexShrink: 0,
+            }} />
+            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{currentStep.text}</span>
+          </div>
+
+          {/* checklist */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {STEPS.map((s) => {
+              const done = elapsed > (STEPS[STEPS.indexOf(s) + 1]?.at ?? 999);
+              const active = currentStep === s;
+              return (
+                <div key={s.at} style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  fontSize: 12,
+                  color: done ? C.green : active ? "#1A1A1A" : "#BBB",
+                  fontWeight: active ? 600 : 400,
+                }}>
+                  <span style={{ width: 13, flexShrink: 0 }}>{done ? "✓" : active ? "▸" : "·"}</span>
+                  {s.text}
+                </div>
+              );
+            })}
+          </div>
+
+          <p style={{ fontSize: 11, color: C.disabled, margin: "12px 0 0", textAlign: "center" }}>
+            AliExpress жорстко захищений — обхід займає ~40–50 секунд. Це нормально 👌
+          </p>
+        </div>
+      )}
     </form>
   );
 }
